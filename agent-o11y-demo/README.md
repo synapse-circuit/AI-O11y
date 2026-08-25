@@ -206,4 +206,3 @@ proven out.
   the `AGENTO11Y_*` vars are set) — you just won't get OTel traces/metrics.
 - Swap `ANTHROPIC_MODEL` to a stronger model (e.g. `claude-sonnet-5`) if you
   want better routing judgment; the default is chosen for low cost.
-# AI-O11y

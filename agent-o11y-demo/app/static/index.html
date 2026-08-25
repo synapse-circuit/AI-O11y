@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Acme Cloud Support</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2e38;
+    --text: #e8e9ec;
+    --muted: #9096a3;
+    --accent: #6c8cff;
+    --user-bubble: #2c3550;
+    --assistant-bubble: #1e222c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 {
+    font-size: 15px;
+    margin: 0;
+    font-weight: 600;
+  }
+  header p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .headerActions { display: flex; gap: 8px; }
+  #newConvo, #runEvals {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  #newConvo:hover, #runEvals:hover { color: var(--text); border-color: var(--accent); }
+  #runEvals:disabled { opacity: 0.5; cursor: default; }
+
+  #evalPanel {
+    display: none;
+    flex-direction: column;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    max-height: 55vh;
+    overflow-y: auto;
+  }
+  #evalPanel.open { display: flex; }
+  #evalPanel .evalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  #evalPanel h2 { font-size: 14px; margin: 0; }
+  #evalStatus { font-size: 13px; color: var(--muted); }
+  #evalClose {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  #evalClose:hover { color: var(--text); }
+  #evalSummary { font-size: 13px; margin-bottom: 10px; }
+  #evalSummary a { color: var(--accent); }
+  table.evalTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.evalTable th, table.evalTable td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.evalTable th { color: var(--muted); font-weight: 500; }
+  .pass-yes { color: #4bd0a0; }
+  .pass-no { color: #f26b6b; }
+  .evalError { color: #f26b6b; font-size: 13px; }
+
+  #log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .row { display: flex; flex-direction: column; max-width: 70%; }
+  .row.user { align-self: flex-end; align-items: flex-end; }
+  .row.assistant { align-self: flex-start; align-items: flex-start; }
+  .bubble {
+    padding: 10px 14px;
+    border-radius: 12px;
+    line-height: 1.4;
+    font-size: 14px;
+    white-space: pre-wrap;
+  }
+  .row.user .bubble { background: var(--user-bubble); }
+  .row.assistant .bubble { background: var(--assistant-bubble); border: 1px solid var(--border); }
+  .badge {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    padding: 0 2px;
+  }
+  .badge.agent-concierge { color: #6c8cff; }
+  .badge.agent-billing-specialist { color: #f2a44b; }
+  .badge.agent-technical-specialist { color: #4bd0a0; }
+  .badge.agent-account-specialist { color: #e06ab0; }
+
+  form {
+    display: flex;
+    gap: 10px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+  }
+  input[type="text"] {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); }
+  button[type="submit"] {
+    background: var(--accent);
+    border: none;
+    color: white;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button[type="submit"]:disabled { opacity: 0.5; cursor: default; }
+
+  .hint { font-size: 12px; color: var(--muted); padding: 0 20px 14px; }
+  .typing { font-size: 13px; color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Acme Cloud Support</h1>
+    <p>Concierge, billing, technical, and account agents -- routed automatically</p>
+  </div>
+  <div class="headerActions">
+    <button id="runEvals" type="button">Run evaluations</button>
+    <button id="newConvo" type="button">New conversation</button>
+  </div>
+</header>
+
+<div id="evalPanel">
+  <div class="evalHeader">
+    <h2>Eval suite: acme-support-starter</h2>
+    <button id="evalClose" type="button">Close</button>
+  </div>
+  <div id="evalStatus"></div>
+  <div id="evalSummary"></div>
+  <div id="evalResults"></div>
+</div>
+
+<div id="log"></div>
+
+<p class="hint">
+  Try: "What's your refund policy?" &middot; "Can you check invoice INV-1002?" &middot;
+  "Is the database down?" &middot; "I need to reset the password for ACC-01" &middot;
+  "I'm on ACC-02, can I get a refund for INV-1003?" (chained handoff: account &rarr; billing)
+</p>
+
+<form id="chatForm">
+  <input id="messageInput" type="text" placeholder="Ask something..." autocomplete="off" />
+  <button type="submit">Send</button>
+</form>
+
+<script>
+  const log = document.getElementById("log");
+  const form = document.getElementById("chatForm");
+  const input = document.getElementById("messageInput");
+  const newConvoBtn = document.getElementById("newConvo");
+  const runEvalsBtn = document.getElementById("runEvals");
+  const evalPanel = document.getElementById("evalPanel");
+  const evalStatus = document.getElementById("evalStatus");
+  const evalSummary = document.getElementById("evalSummary");
+  const evalResults = document.getElementById("evalResults");
+  const evalCloseBtn = document.getElementById("evalClose");
+
+  let conversationId = crypto.randomUUID();
+
+  function addRow(role, text, agent) {
+    const row = document.createElement("div");
+    row.className = "row " + role;
+
+    if (role === "assistant" && agent) {
+      const badge = document.createElement("div");
+      badge.className = "badge agent-" + agent;
+      badge.textContent = agent;
+      row.appendChild(badge);
+    }
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    row.appendChild(bubble);
+
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+    return row;
+  }
+
+  newConvoBtn.addEventListener("click", () => {
+    conversationId = crypto.randomUUID();
+    log.innerHTML = "";
+  });
+
+  evalCloseBtn.addEventListener("click", () => {
+    evalPanel.classList.remove("open");
+  });
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function renderEvalResults(summary) {
+    const passRatePct = Math.round(summary.pass_rate * 100);
+    const linkHtml = summary.experiment_url
+      ? ` &middot; <a href="${escapeHtml(summary.experiment_url)}" target="_blank" rel="noopener">view in Grafana Cloud</a>`
+      : "";
+    evalSummary.innerHTML =
+      `<strong>${summary.passed_count}/${summary.total} passed (${passRatePct}%)</strong>` +
+      ` &middot; agent_version=${escapeHtml(summary.agent_version)}${linkHtml}`;
+
+    const rows = summary.results
+      .map((r) => {
+        const passClass = r.passed ? "pass-yes" : "pass-no";
+        const passLabel = r.passed ? "pass" : "fail";
+        return (
+          "<tr>" +
+          `<td>${escapeHtml(r.id)}</td>` +
+          `<td>${escapeHtml(r.agent)}</td>` +
+          `<td>${r.score.toFixed(2)}</td>` +
+          `<td class="${passClass}">${passLabel}</td>` +
+          `<td>${escapeHtml(r.explanation)}</td>` +
+          "</tr>"
+        );
+      })
+      .join("");
+
+    evalResults.innerHTML =
+      '<table class="evalTable"><thead><tr>' +
+      "<th>case</th><th>agent</th><th>score</th><th>result</th><th>why</th>" +
+      "</tr></thead><tbody>" +
+      rows +
+      "</tbody></table>";
+  }
+
+  runEvalsBtn.addEventListener("click", async () => {
+    const ok = confirm(
+      "Run the 10-case eval suite? This calls Claude roughly 20 times and " +
+        "publishes results to Grafana Cloud as an experiment. Takes about a minute."
+    );
+    if (!ok) return;
+
+    evalPanel.classList.add("open");
+    evalStatus.textContent = "Running eval suite... this takes about a minute.";
+    evalSummary.innerHTML = "";
+    evalResults.innerHTML = "";
+    runEvalsBtn.disabled = true;
+
+    try {
+      const res = await fetch("/evals/run", { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        evalStatus.textContent = "";
+        evalSummary.innerHTML = `<span class="evalError">Error: ${escapeHtml(data.detail || res.statusText)}</span>`;
+      } else {
+        evalStatus.textContent = "";
+        renderEvalResults(data);
+      }
+    } catch (err) {
+      evalStatus.textContent = "";
+      evalSummary.innerHTML = `<span class="evalError">Network error: ${escapeHtml(err.message)}</span>`;
+    } finally {
+      runEvalsBtn.disabled = false;
+    }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const message = input.value.trim();
+    if (!message) return;
+
+    addRow("user", message);
+    input.value = "";
+    input.disabled = true;
+
+    const typingRow = document.createElement("div");
+    typingRow.className = "row assistant typing-row";
+    typingRow.innerHTML = '<div class="typing">thinking...</div>';
+    log.appendChild(typingRow);
+    log.scrollTop = log.scrollHeight;
+
+    try {
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversation_id: conversationId, message }),
+      });
+
+      typingRow.remove();
+
+      if (!res.ok) {
+        const detail = await res.text();
+        addRow("assistant", "Error: " + res.status + " " + detail, null);
+      } else {
+        const data = await res.json();
+        addRow("assistant", data.reply, data.agent);
+      }
+    } catch (err) {
+      typingRow.remove();
+      addRow("assistant", "Network error: " + err.message, null);
+    } finally {
+      input.disabled = false;
+      input.focus();
+    }
+  });
+</script>
+
+</body>
+</html>
